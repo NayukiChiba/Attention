@@ -12,6 +12,7 @@ def get_dir(path: Path) -> Path:
 
 # 数据集位置
 DATASETS_DIR = get_dir(ROOT / "datasets")
+DOWNLOADS_DIR = get_dir(DATASETS_DIR / "downloads")
 RAW_DATASETS_DIR = get_dir(DATASETS_DIR / "raw")
 PROCESSED_DATASETS_DIR = get_dir(DATASETS_DIR / "processed")
 
@@ -27,7 +28,12 @@ FIGURES_DIR = get_dir(OUTPUTS_DIR / "figures")
 BEST_MODEL_PATH = CHECKPOINTS_DIR / "best_model.pth"
 LAST_MODEL_PATH = CHECKPOINTS_DIR / "last_model.pth"
 
+# 下载的数据集文件
+DATASET_ZIP_PATH = DOWNLOADS_DIR / "THUCNews.zip"
+EXTRACTED_DATASET_DIR = RAW_DATASETS_DIR / "dataset"
+
 # 原始数据集文件
+DATASET_PATH = RAW_DATASETS_DIR / "dataset.txt"
 RAW_TRAIN_DATASET_PATH = RAW_DATASETS_DIR / "train.txt"
 RAW_TEST_DATASET_PATH = RAW_DATASETS_DIR / "test.txt"
 RAW_VAL_DATASET_PATH = RAW_DATASETS_DIR / "val.txt"
