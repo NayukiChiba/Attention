@@ -7,6 +7,7 @@ THUCNews数据集下载脚本
 2. 自动解压
 """
 
+import shutil
 import zipfile
 from pathlib import Path
 
@@ -57,7 +58,7 @@ def extract_zip(zip_path: Path, extract_dir: Path) -> None:
     with zipfile.ZipFile(zip_path, "r") as zip_ref:
         # info_list()方法返回zip文件中所有成员的信息列表
         # namelist()方法返回zip文件中所有成员的名称列表
-        members = zip_ref.namelist()
+        members = zip_ref.infolist()
         # file_size属性表示成员的原始大小,通过sum()函数计算所有成员的总大小
         total_size = sum(member.file_size for member in members)
         with tqdm(total=total_size, unit="B", unit_scale=True, desc="解压进度") as pbar:
@@ -94,7 +95,9 @@ def download_thucnews() -> Path:
         # 清空已存在的解压目录
         for item in paths.EXTRACTED_DATASET_DIR.iterdir():
             if item.is_dir():
-                item.rmdir()
+                # item.rmdir()只能删除空目录,如果目录不为空则会抛出异常
+                # 因此使用shutil.rmtree()递归删除目录及其内容
+                shutil.rmtree(item)
             else:
                 item.unlink()
     extract_zip(paths.DATASET_ZIP_PATH, paths.EXTRACTED_DATASET_DIR)
