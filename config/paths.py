@@ -14,12 +14,12 @@ RAW_DATASETS_DIR = get_dir(DATASETS_DIR / 'raw')
 PROCESSED_DATASETS_DIR = get_dir(DATASETS_DIR / 'processed')
 
 # 产出位置
-OUTPUT_DIR = get_dir(ROOT / 'output')
+OUTPUTS_DIR = get_dir(ROOT / 'outputs')
 
-CHECKPOINTS_DIR = get_dir(OUTPUT_DIR / 'checkpoints')
-LOGS_DIR = get_dir(OUTPUT_DIR / 'logs')
-TENSORBOARD_DIR = get_dir(OUTPUT_DIR / 'tensorboard')
-FIGURES_DIR = get_dir(OUTPUT_DIR / 'figures')
+CHECKPOINTS_DIR = get_dir(OUTPUTS_DIR / 'checkpoints')
+LOGS_DIR = get_dir(OUTPUTS_DIR / 'logs')
+TENSORBOARD_DIR = get_dir(OUTPUTS_DIR / 'tensorboard')
+FIGURES_DIR = get_dir(OUTPUTS_DIR / 'figures')
 
 # 模型保存位置
 BEST_MODEL_PATH = CHECKPOINTS_DIR / 'best_model.pth'
