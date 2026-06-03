@@ -63,6 +63,12 @@ def extract_zip(zip_path: Path, extract_dir: Path) -> None:
         total_size = sum(member.file_size for member in members)
         with tqdm(total=total_size, unit="B", unit_scale=True, desc="解压进度") as pbar:
             for member in members:
+                # 修复中文乱码: cp437 -> bytes -> gbk -> 中文
+                try:
+                    member.filename = member.filename.encode("cp437").decode("gbk")
+                except (UnicodeDecodeError, UnicodeEncodeError):
+                    pass  # 转换失败则保留原名
+
                 zip_ref.extract(member, extract_dir)
                 pbar.update(member.file_size)
     print(f"数据集解压完成: {extract_dir}")
