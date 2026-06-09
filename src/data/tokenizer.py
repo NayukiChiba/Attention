@@ -3,6 +3,8 @@ src/data/tokenizer.py
 字符级分词器实现
 """
 
+import json
+from pathlib import Path
 from typing import Dict, List
 
 from config import DataConfig
@@ -118,3 +120,41 @@ class CharTokenizer:
             chars.append(char)
 
         return "".join(chars)
+
+    def save(self, filepath: Path) -> None:
+        """
+        保存词表到文件
+        Args:
+            filepath (Path): 词表保存路径
+        """
+        filepath.parent.mkdir(parents=True, exist_ok=True)
+
+        # 准备保存数据
+        data = {
+            "char2id": self.char2id,
+            "id2char": {idx: char for char, idx in self.char2id.items()},
+            "special_tokens": self.special_tokens,
+        }
+
+        with filepath.open("w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=4)
+
+        print(f"词表已保存到 {filepath}")
+
+    @staticmethod
+    def load(filepath: Path) -> "CharTokenizer":
+        """
+        从文件加载词表
+        Args:
+            filepath (Path): 词表文件路径
+        """
+        with filepath.open("r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        tokenizer = CharTokenizer()
+        tokenizer.char2id = data["char2id"]
+        tokenizer.id2char = {int(idx): char for idx, char in data["id2char"].items()}
+        tokenizer.special_tokens = data["special_tokens"]
+
+        print(f"词表已从 {filepath} 加载, 共 {len(tokenizer.char2id)} 个字符")
+        return tokenizer
