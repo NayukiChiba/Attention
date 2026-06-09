@@ -70,3 +70,51 @@ class CharTokenizer:
         print(f"词表构建完成: {len(self.char2id)} 个字符 (包含特殊token)")
         print(f"特殊 token 有: {len(self.special_tokens)}个")
         print(f"普通字符有: {len(sorted_chars)}个")
+
+    def encode(
+        self, text: str, add_bos: bool = True, add_eos: bool = True
+    ) -> List[int]:
+        """
+        将文本编码为 id 列表
+        Args:
+            text (str): 输入文本
+            add_bos (bool): 是否在序列开头添加 <BOS> token
+            add_eos (bool): 是否在序列结尾添加 <EOS> token
+        Returns:
+            List[int]: 编码后的 id 列表
+        """
+
+        # 编码文本, 未知字符使用 <UNK> token 的 id
+        unk_id = self.char2id[self.unk_token]
+        token_ids = [self.char2id.get(char, unk_id) for char in text]
+
+        # 添加特殊token
+        if add_bos:
+            token_ids = [self.char2id[self.bos_token]] + token_ids
+        if add_eos:
+            token_ids = token_ids + [self.char2id[self.eos_token]]
+
+        return token_ids
+
+    def decode(self, token_ids: List[int], skip_special_tokens: bool = True) -> str:
+        """
+        将 id 列表解码为文本
+        Args:
+            token_ids (List[int]): 输入 id 列表
+            skip_special_tokens (bool): 是否跳过特殊 token
+        Returns:
+            str: 解码后的文本
+
+        """
+        chars = []
+        # 将 id 转换回字符, 如果 skip_special_tokens=True 则跳过特殊 token
+        for token_id in token_ids:
+            # 如果 token_id 不在词表中, 则使用 <UNK> token 的字符
+            char = self.id2char.get(token_id, self.unk_token)
+            # 如果跳过特殊 token 且当前字符是特殊 token, 则继续下一个 id
+            if skip_special_tokens and char in self.special_tokens:
+                continue
+
+            chars.append(char)
+
+        return "".join(chars)
