@@ -21,7 +21,7 @@ class CharTokenizer:
     - <EOS>: 序列结束token, 用于标记文本序列的结束
     """
 
-    def __init__(self, data_config):
+    def __init__(self, data_config: DataConfig | None = None):
         self.data_config = data_config or DataConfig()
 
         # 特殊token列表
