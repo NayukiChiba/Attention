@@ -44,3 +44,25 @@ def create_causal_mask(
     ).to(device)
     # 添加一个批次维度,形状变为 (1, seq_length, seq_length)
     return mask
+
+
+def create_padding_mask(input_ids: torch.Tensor, pad_token_id: int) -> torch.Tensor:
+    """
+    创建一个填充掩码(Padding Mask),用于标记输入序列中的填充位置
+
+    由于我们在数据集中使用 <PAD> token 来填充短文本,模型不应该关注这些位置
+    填充掩码通常与注意力掩码结合使用,确保模型不会将注意力分配给填充位置
+
+    Args:
+        input_ids (torch.Tensor): 输入的 token id 张量, 形状为 (batch_size, seq_length)
+        pad_token_id (int): 用于填充的 token id,通常是 tokenizer 的 pad_token_id
+
+    Returns:
+        torch.Tensor: 形状为 (batch_size, 1, seq_length) 的填充掩码张量
+        True 表示该位置是填充, 需要被mask, 不能被 attention 到
+        False 表示该位置不是填充, 不需要被mask, 可以被 attention 到
+    """
+    # 这里我们暂时返回一个全False的掩码,因为我们在数据集中已经处理了文本长度
+    # 如果你在后续实现中使用了动态长度的输入,可以根据实际情况生成填充掩码
+    # shape=(batch_size, 1, seq_length)
+    return input_ids == pad_token_id
