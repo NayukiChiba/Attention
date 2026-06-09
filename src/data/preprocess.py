@@ -48,7 +48,7 @@ def read_news_file(news_dir: Path) -> List[Tuple[str, str]]:
 
 def clean_text(text: str) -> str:
     """
-    清洗文本内容, 去除多余的空白字符
+    清洗文本内容, 去除多余的空白字符和不可见字符
     Args:
         text(str): 原始文本内容
     Returns:
@@ -57,7 +57,31 @@ def clean_text(text: str) -> str:
     >>> clean_text("  这是   一段   测试文本。  ")
     '这是 一段 测试文本。'
     """
-    # 将连续的空白字符替换为一个空格, strip()方法去除首尾空白
+    import re
+    import unicodedata
+
+    # 移除 BOM 标记
+    text = text.replace("﻿", "")
+    # 移除零宽字符
+    text = text.replace("​", "")  # 零宽空格
+    text = text.replace("‌", "")  # 零宽非连接符
+    text = text.replace("‍", "")  # 零宽连接符
+
+    # 移除所有控制字符
+    text = re.sub(r"[\x00-\x1f\x7f-\x9f]", "", text)
+
+    # 过滤掉不可打印的字符（保留中文、英文、数字、标点）
+    cleaned = []
+    for char in text:
+        category = unicodedata.category(char)
+        # 保留：字母、数字、标点、符号、空格、中文
+        # 过滤：控制字符(Cc)、私有区(Co)、代理区(Cs)、未分配(Cn)
+        if category[0] not in ("C",):  # C开头都是控制/私有/未分配
+            cleaned.append(char)
+
+    text = "".join(cleaned)
+
+    # 将连续的空白字符替换为一个空格
     return " ".join(text.split())
 
 
