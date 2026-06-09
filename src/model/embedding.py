@@ -120,3 +120,92 @@ class GPTEmbedding(nn.Module):
         position_embedding[:, 0::2] = torch.sin(position * div_term)  # 偶数维
         position_embedding[:, 1::2] = torch.cos(position * div_term)  # 奇数维
         return position_embedding  # shape=(max_seq_length, embedding_dim)
+
+    def forward(self, input_ids: torch.Tensor) -> torch.Tensor:
+        """
+        Args:
+            input_ids (torch.Tensor): 输入的 token id 张量, 形状为 (batch_size, seq_length)
+
+        Returns:
+            embeddings:shape=(batch_size, seq_length, embedding_dim)
+        """
+        batch_size, seq_length = input_ids.shape
+        # 1. 获取 token 嵌入
+        token_embedding = self.token_embedding(
+            input_ids
+        )  # shape=(batch_size, seq_length, embedding_dim)
+
+        # 2. 获取位置编码
+        if self.pos_encoding_type == "learnable":
+            position_ids = torch.arange(seq_length, device=input_ids.device).unsqueeze(
+                0
+            )  # shape=(1, seq_length)
+            position_embedding = self.pos_embedding(
+                position_ids
+            )  # shape=(1, seq_length, embedding_dim)
+        else:  # sinusoidal
+            position_embedding = self.pos_embedding[:seq_length, :].unsqueeze(
+                0
+            )  # shape=(1, seq_length, embedding_dim)
+
+        # 3. 将 token 嵌入和位置编码相加
+        embeddings = (
+            token_embedding + position_embedding
+        )  # shape=(batch_size, seq_length, embedding_dim)
+
+        # 4. 应用 dropout
+        embeddings = self.dropout(
+            embeddings
+        )  # shape=(batch_size, seq_length, embedding_dim)
+
+        # 应用 dropout
+        return embeddings  # shape=(batch_size, seq_length, embedding_dim)
+
+
+if __name__ == "__main__":
+    from config import GPTConfig
+
+    config = GPTConfig()
+    embedding_layer = GPTEmbedding(
+        vocab_size=config.vocab_size,
+        embedding_dim=config.embedding_dim,
+        block_size=config.context_length,
+        dropout_rate=config.dropout_rate,
+        pos_encoding_type=config.pos_encoding_type,
+    )
+
+    embeddings_sinusoidal = GPTEmbedding(
+        vocab_size=config.vocab_size,
+        embedding_dim=config.embedding_dim,
+        block_size=config.context_length,
+        dropout_rate=config.dropout_rate,
+        pos_encoding_type="sinusoidal",
+    )
+
+    # 测试输入
+    batch_size = 4
+    seq_length = 10
+    input_ids = torch.randint(0, config.vocab_size, (batch_size, seq_length))
+
+    # 前向传播测试
+    output = embedding_layer(input_ids)
+    print(
+        "输出形状 (learnable):", output.shape
+    )  # 应该是 (batch_size, seq_length, embedding_dim)
+
+    output_sinusoidal = embeddings_sinusoidal(input_ids)
+    print("输出形状 (sinusoidal):", output_sinusoidal.shape)
+
+    # 测试位置编码是否正确叠加
+    # 验证形状
+    assert output.shape == (batch_size, seq_length, config.embedding_dim)
+    assert output_sinusoidal.shape == (batch_size, seq_length, config.embedding_dim)
+    print("✅ 形状测试通过")
+
+    # 参数量统计
+    print(
+        f"\n可学习位置编码参数量: {sum(p.numel() for p in embedding_layer.parameters()):,}"
+    )
+    print(
+        f"正弦位置编码参数量: {sum(p.numel() for p in embeddings_sinusoidal.parameters()):,}"
+    )
