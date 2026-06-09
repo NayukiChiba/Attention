@@ -63,6 +63,10 @@ def extract_zip(zip_path: Path, extract_dir: Path) -> None:
         total_size = sum(member.file_size for member in members)
         with tqdm(total=total_size, unit="B", unit_scale=True, desc="解压进度") as pbar:
             for member in members:
+                # 跳过 macOS 元数据目录
+                if "__MACOSX" in member.filename or member.filename.startswith("._"):
+                    continue
+
                 # 修复中文乱码: cp437 -> utf-8
                 try:
                     # ZIP中文件名被cp437错误解析，还原为UTF-8字节再正确解码
