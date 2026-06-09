@@ -85,15 +85,15 @@ class GPTConfig:
     # 词表大小（运行时由 tokenizer 确定）
     vocab_size: int = 8000
     # 上下文长度（最大 token 数）
-    block_size: int = 256
+    context_length: int = 256
     # 模型隐藏维度
-    d_model: int = 384
+    embedding_dim: int = 384
     # 多头注意力头数
-    num_heads: int = 8
+    num_attention_heads: int = 8
     # Transformer 解码器层数
     num_layers: int = 8
     # 前馈网络中间维度
-    d_ff: int = 1536  # d_model × 4
+    ffn_hidden_dim: int = 1536  # embedding_dim × 4
     # Dropout 比例
     dropout_rate: float = 0.1
     # 位置编码类型
@@ -103,22 +103,22 @@ class GPTConfig:
     # LayerNorm 位置（pre-norm 训练更稳定）
     norm_type: Literal["pre", "post"] = "pre"
     # LayerNorm 数值稳定项
-    layer_norm_epsilon: float = 1e-5
+    layer_norm_eps: float = 1e-5
     # 输出层与词嵌入层共享权重（减少参数量）
-    tie_weights: bool = True
+    share_embedding_weights: bool = True
 
     def __post_init__(self):
         assert self.vocab_size > 0, "vocab_size 必须 > 0"
-        assert self.block_size > 0, "block_size 必须 > 0"
-        assert self.d_model > 0, "d_model 必须 > 0"
-        assert self.num_heads > 0, "num_heads 必须 > 0"
+        assert self.context_length > 0, "context_length 必须 > 0"
+        assert self.embedding_dim > 0, "embedding_dim 必须 > 0"
+        assert self.num_attention_heads > 0, "num_attention_heads 必须 > 0"
         assert self.num_layers > 0, "num_layers 必须 > 0"
-        assert self.d_ff > 0, "d_ff 必须 > 0"
-        assert self.d_model % self.num_heads == 0, (
-            f"d_model ({self.d_model}) 必须能被 num_heads ({self.num_heads}) 整除"
+        assert self.ffn_hidden_dim > 0, "ffn_hidden_dim 必须 > 0"
+        assert self.embedding_dim % self.num_attention_heads == 0, (
+            f"embedding_dim ({self.embedding_dim}) 必须能被 num_attention_heads ({self.num_attention_heads}) 整除"
         )
         assert 0 <= self.dropout_rate < 1, "dropout_rate 必须在 [0, 1) 内"
-        assert self.layer_norm_epsilon > 0, "layer_norm_epsilon 必须 > 0"
+        assert self.layer_norm_eps > 0, "layer_norm_eps 必须 > 0"
 
     def _summary(self) -> None:
         _summary(self)
