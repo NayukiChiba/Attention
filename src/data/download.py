@@ -63,11 +63,13 @@ def extract_zip(zip_path: Path, extract_dir: Path) -> None:
         total_size = sum(member.file_size for member in members)
         with tqdm(total=total_size, unit="B", unit_scale=True, desc="解压进度") as pbar:
             for member in members:
-                # 修复中文乱码: cp437 -> bytes -> gbk -> 中文
+                # 修复中文乱码: cp437 -> utf-8
                 try:
-                    member.filename = member.filename.encode("cp437").decode("gbk")
+                    # ZIP中文件名被cp437错误解析，还原为UTF-8字节再正确解码
+                    member.filename = member.filename.encode("cp437").decode("utf-8")
                 except (UnicodeDecodeError, UnicodeEncodeError):
-                    pass  # 转换失败则保留原名
+                    # 转换失败则保留原名
+                    pass
 
                 zip_ref.extract(member, extract_dir)
                 pbar.update(member.file_size)
@@ -96,17 +98,15 @@ def download_thucnews() -> Path:
                 f"到 {paths.DATASET_ZIP_PATH}中"
             )
 
-    # 解压数据集
-    if paths.EXTRACTED_DATASET_DIR.exists():
+    # 解压数据集到 raw 目录
+    if paths.THUCNEWS_RAW_DIR.exists():
         # 清空已存在的解压目录
-        for item in paths.EXTRACTED_DATASET_DIR.iterdir():
-            if item.is_dir():
-                # item.rmdir()只能删除空目录,如果目录不为空则会抛出异常
-                # 因此使用shutil.rmtree()递归删除目录及其内容
-                shutil.rmtree(item)
-            else:
-                item.unlink()
-    extract_zip(paths.DATASET_ZIP_PATH, paths.EXTRACTED_DATASET_DIR)
+        shutil.rmtree(paths.THUCNEWS_RAW_DIR)
+
+    # 解压到 raw 目录的父目录，让 THUCNews/ 自动创建
+    extract_zip(paths.DATASET_ZIP_PATH, paths.RAW_DATASETS_DIR)
+
+    return paths.THUCNEWS_RAW_DIR
 
 
 if __name__ == "__main__":
