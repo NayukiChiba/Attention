@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 from typing import Dict, List
 
-from config import DataConfig
+from config import DataConfig, paths
 
 
 class CharTokenizer:
@@ -158,3 +158,96 @@ class CharTokenizer:
 
         print(f"词表已从 {filepath} 加载, 共 {len(tokenizer.char2id)} 个字符")
         return tokenizer
+
+    @property
+    def vocab_size(self) -> int:
+        """返回词表大小"""
+        return len(self.char2id)
+
+    @property
+    def pad_token_id(self) -> int:
+        """返回 <PAD> token 的 id"""
+        return self.char2id[self.pad_token]
+
+    @property
+    def unk_token_id(self) -> int:
+        """返回 <UNK> token 的 id"""
+        return self.char2id[self.unk_token]
+
+    @property
+    def bos_token_id(self) -> int:
+        """返回 <BOS> token 的 id"""
+        return self.char2id[self.bos_token]
+
+    @property
+    def eos_token_id(self) -> int:
+        """返回 <EOS> token 的 id"""
+        return self.char2id[self.eos_token]
+
+
+def build_and_save_vocab(
+    train_file: Path, data_config: DataConfig, save_path: Path
+) -> CharTokenizer:
+    """
+    构建并保存分词器, 注意只能用训练集
+    Args:
+        train_file (Path): 训练文件路径, 文件格式为每行 "label\ttext"
+        data_config (DataConfig): 数据配置对象
+        save_path (Path): 词表保存路径
+    Returns:
+        CharTokenizer: 构建好的分词器对象
+    """
+
+    # 先读取训练文本
+    data_config = data_config or DataConfig()
+    texts = []
+    with train_file.open("r", encoding="utf-8") as f:
+        for line in f:
+            parts = line.strip().split("\t")
+            if len(parts) != 2:
+                continue
+            label, text = parts
+            texts.append(text)
+
+    # 构建分词器
+    tokenizer = CharTokenizer(data_config)
+    tokenizer.build_vocab(texts)
+    tokenizer.save(save_path)
+    return tokenizer
+
+
+if __name__ == "__main__":
+    # 构建并保存词表的示例
+    vocab_path = paths.PROCESSED_DATASETS_DIR / "vocab.json"
+    data_config = DataConfig()
+    tokenizer = build_and_save_vocab(
+        paths.INTERIM_TRAIN_DATASET_PATH, data_config, save_path=vocab_path
+    )
+
+    # 测试编码解码
+    test_text = "这是一个测试文本。"
+    print(f"原始文本: {test_text}")
+
+    token_ids = tokenizer.encode(test_text)
+    print(f"编码: {token_ids}")
+
+    decoded_text = tokenizer.decode(token_ids)
+    print(f"解码: {decoded_text}")
+
+    # 一致性检查
+    assert test_text == decoded_text, "编码解码不一致!"
+    print("编码解码一致性检查通过!")
+
+    # 特殊token测试
+    print(f"<PAD> token id: {tokenizer.pad_token_id}")
+    print(f"<UNK> token id: {tokenizer.unk_token_id}")
+    print(f"<BOS> token id: {tokenizer.bos_token_id}")
+    print(f"<EOS> token id: {tokenizer.eos_token_id}")
+
+    # 未知字符测试
+    unknown_text = "这是一个包含未知字符的文本: 😊"
+    unknown_token_ids = tokenizer.encode(unknown_text)
+    print(f"包含未知字符的文本编码: {unknown_token_ids}")
+    decoded_unknown_text = tokenizer.decode(unknown_token_ids)
+
+    print(f"包含未知字符的文本解码: {decoded_unknown_text}")
