@@ -97,16 +97,18 @@ def filter_data(
 
 
 def split_dataset(
-    data: List[Tuple[str, str]], data_config: DataConfig
+    data: List[Tuple[str, str]], data_config: DataConfig | None = None
 ) -> Tuple[List[Tuple[str, str]], List[Tuple[str, str]], List[Tuple[str, str]]]:
     """
     划分数据集为训练集、验证集和测试集
     Args:
         data(List[Tuple[str, str]]): (类别, 文本内容) 列表
-        data_config(DataConfig): 配置对象，包含划分参数
+        data_config(DataConfig|None): 配置对象，包含划分参数
     Returns:
         Tuple[List[Tuple[str, str]], List[Tuple[str, str]], List[Tuple[str, str]]]: 训练集、验证集和测试集列表
     """
+    data_config = data_config or DataConfig()
+
     # 打乱数据顺序以保证划分的随机性
     from collections import defaultdict
 
@@ -168,3 +170,30 @@ def save_dataset(
     print(f"  {paths.INTERIM_TRAIN_DATASET_PATH}")
     print(f"  {paths.INTERIM_VAL_DATASET_PATH}")
     print(f"  {paths.INTERIM_TEST_DATASET_PATH}")
+
+
+def preprocess_data(data_config: DataConfig | None = None) -> None:
+    """
+    预处理数据的主函数, 包含读取、清洗、过滤、划分和保存等步骤
+    Args:
+        data_config(DataConfig|None): 配置对象，包含预处理参数
+    """
+    data_config = data_config or DataConfig()
+    # 1. 读取数据集
+    raw_data = read_news_file(paths.THUCNEWS_RAW_DIR)
+
+    # 2. 清洗文本内容
+    cleaned_data = [(label, clean_text(text)) for label, text in raw_data]
+
+    # 3. 过滤数据
+    filtered_data = filter_data(cleaned_data, data_config)
+
+    # 4. 划分数据集
+    train_data, val_data, test_data = split_dataset(filtered_data, data_config)
+
+    # 5. 保存数据集到文件
+    save_dataset(train_data, val_data, test_data)
+
+
+if __name__ == "__main__":
+    preprocess_data()
