@@ -131,17 +131,17 @@ def create_dataloader(
     train_dataset = NewsDataset(
         paths.INTERIM_TRAIN_DATASET_PATH,
         tokenizer,
-        block_size=gpt_config.block_size,
+        block_size=gpt_config.context_length,
     )
     val_dataset = NewsDataset(
         paths.INTERIM_VAL_DATASET_PATH,
         tokenizer,
-        block_size=gpt_config.block_size,
+        block_size=gpt_config.context_length,
     )
     test_dataset = NewsDataset(
         paths.INTERIM_TEST_DATASET_PATH,
         tokenizer,
-        block_size=gpt_config.block_size,
+        block_size=gpt_config.context_length,
     )
 
     train_loader = torch.utils.data.DataLoader(
