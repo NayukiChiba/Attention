@@ -57,15 +57,13 @@ class Evaluator:
 
         with torch.no_grad():
             for batch in pbar:
-                # 获取输入和目标
-                input_ids = batch["input_ids"].to(self.config.device)
-                target_ids = batch["target_ids"].to(self.config.device)
-                attention_mask = batch.get("attention_mask", None)
-                if attention_mask is not None:
-                    attention_mask = attention_mask.to(self.config.device)
+                # 获取输入和目标（dataset 返回 (input_ids, target_ids) 元组）
+                input_ids, target_ids = batch
+                input_ids = input_ids.to(self.config.device)
+                target_ids = target_ids.to(self.config.device)
 
                 # 前向传播
-                logits = self.model(input_ids, attention_mask)
+                logits = self.model(input_ids)
 
                 # 计算损失
                 loss = nn.functional.cross_entropy(
