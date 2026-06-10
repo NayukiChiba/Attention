@@ -163,7 +163,9 @@ class TrainingConfig:
 
     # === 学习率调度 ===
     # 调度策略
-    scheduler_type: Literal["cosine_warmup", "constant"] = "cosine_warmup"
+    scheduler_type: Literal[
+        "cosine_warmup", "cosine", "step", "exponential", "constant"
+    ] = "cosine_warmup"
     # 预热步数（线性从 0 升至 learning_rate）
     warmup_steps: int = 500
     # 最低学习率（相对 learning_rate 的比例）
