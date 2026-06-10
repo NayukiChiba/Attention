@@ -12,7 +12,7 @@ import torch.nn as nn
 import torch.optim as optim
 
 
-def saveCheckpoint(
+def save_checkpoint(
     model: nn.Module,
     optimizer: optim.Optimizer,
     scheduler: Any,
@@ -59,7 +59,7 @@ def saveCheckpoint(
     print(f"检查点已保存到: {checkpoint_path}")
 
 
-def loadCheckpoint(
+def load_checkpoint(
     checkpoint_path: Path,
     model: nn.Module,
     optimizer: optim.Optimizer = None,

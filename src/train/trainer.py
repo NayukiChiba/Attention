@@ -14,7 +14,7 @@ from tqdm import tqdm
 
 from config import paths
 from config.defaults import TrainingConfig
-from src.train.checkpoint import loadCheckpoint, saveCheckpoint
+from src.train.checkpoint import load_checkpoint, save_checkpoint
 from src.train.early_stopping import EarlyStopping
 from src.train.logger import Logger
 from src.train.optimizer import create_optimizer
@@ -238,7 +238,7 @@ class Trainer:
             checkpoint_path: 检查点保存路径
             **kwargs: 其他需要保存的信息
         """
-        saveCheckpoint(
+        save_checkpoint(
             model=self.model,
             optimizer=self.optimizer,
             scheduler=self.scheduler,
@@ -257,7 +257,7 @@ class Trainer:
             checkpoint_path: 检查点路径
         """
         self.logger.info(f"从检查点恢复训练: {checkpoint_path}")
-        checkpoint = loadCheckpoint(
+        checkpoint = load_checkpoint(
             checkpoint_path,
             self.model,
             self.optimizer,
@@ -325,11 +325,6 @@ class Trainer:
             # 检查早停
             if self.early_stopping.should_stop:
                 self.logger.info(f"触发早停: {self.early_stopping.stop_reason}")
-                break
-
-            # 检查是否达到最大步数
-            if self.global_step >= self.config.total_steps:
-                self.logger.info(f"达到最大步数 {self.config.total_steps}")
                 break
 
         self.logger.info("=" * 80)
