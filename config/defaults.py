@@ -85,7 +85,7 @@ class GPTConfig:
     # 词表大小（运行时由 tokenizer 确定）
     vocab_size: int = 8000
     # 上下文长度（最大 token 数）
-    context_length: int = 256
+    context_length: int = 128
     # 模型隐藏维度
     embedding_dim: int = 384
     # 多头注意力头数

@@ -19,11 +19,16 @@ from config import paths
 from config.defaults import DataConfig, GenerationConfig, GPTConfig, TrainingConfig
 from src.cli.menu import show_menu
 from src.cli.parser import create_parser
+from src.data.dataset import create_dataloader
+from src.data.tokenizer import CharTokenizer
+from src.evaluate.evaluator import Evaluator
+from src.inference.generator import TextGenerator
+from src.model.gpt import GPT
+from src.train.trainer import Trainer
 
 
 def _build_tokenizer(data_config: DataConfig = None):
     """从训练数据构建分词器"""
-    from src.data.tokenizer import CharTokenizer
 
     data_config = data_config or DataConfig()
     tokenizer = CharTokenizer(data_config)
@@ -48,7 +53,6 @@ def _build_tokenizer(data_config: DataConfig = None):
 
 def _load_tokenizer():
     """加载已保存的分词器"""
-    from src.data.tokenizer import CharTokenizer
 
     vocab_path = paths.PROCESSED_DATASETS_DIR / "vocab.json"
     if vocab_path.exists():
@@ -61,7 +65,6 @@ def _load_tokenizer():
 
 def _create_dataloaders(tokenizer, gpt_config, training_config):
     """创建数据加载器"""
-    from src.data.dataset import create_dataloader
 
     return create_dataloader(tokenizer, gpt_config, training_config)
 
@@ -175,12 +178,10 @@ def train_main(args):
 
     # 4. 创建模型
     print("创建模型...")
-    from src.model.gpt import GPT
 
     model = GPT(model_config)
 
     # 5. 创建训练器
-    from src.train.trainer import Trainer
 
     trainer = Trainer(
         model=model,
@@ -202,8 +203,6 @@ def train_main(args):
 
 def eval_main(args):
     """评估入口"""
-    from src.evaluate.evaluator import Evaluator
-    from src.model.gpt import GPT
 
     # 1. 加载检查点
     checkpoint_path = Path(args.checkpoint)
@@ -261,8 +260,6 @@ def eval_main(args):
 
 def generate_main(args):
     """生成入口"""
-    from src.inference.generator import TextGenerator
-    from src.model.gpt import GPT
 
     # 1. 加载检查点
     checkpoint_path = Path(args.checkpoint)
