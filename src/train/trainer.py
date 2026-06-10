@@ -182,7 +182,7 @@ class Trainer:
         avg_ppl = torch.exp(torch.tensor(avg_loss)).item()
         return avg_loss, avg_ppl
 
-    def validate_epoch(self) -> tuple[float, float]:
+    def val_epoch(self) -> tuple[float, float]:
         """
         验证一个 epoch
 
@@ -193,7 +193,7 @@ class Trainer:
         total_loss = 0.0
         num_batches = len(self.val_loader)
 
-        pbar = tqdm(self.val_loader, desc=f"Epoch {self.current_epoch} [Val]")
+        pbar = tqdm(self.val_loader, desc=f"[VAL] Epoch {self.current_epoch}")
 
         with torch.no_grad():
             for batch in pbar:
@@ -292,7 +292,7 @@ class Trainer:
             train_loss, train_ppl = self.train_epoch()
 
             # 验证一个 epoch
-            val_loss, val_ppl = self.validate_epoch()
+            val_loss, val_ppl = self.val_epoch()
 
             # 记录 epoch 信息
             self.logger.log_epoch(
