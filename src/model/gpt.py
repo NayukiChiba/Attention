@@ -100,33 +100,45 @@ class GPT(nn.Module):
             torch.nn.init.zeros_(module.bias)
 
     def forward(
-        self, input_ids: torch.Tensor, attention_mask: torch.Tensor = None
-    ) -> torch.Tensor:
+        self,
+        input_ids: torch.Tensor,
+        attention_mask: torch.Tensor = None,
+        return_attention_weights: bool = False,
+    ) -> torch.Tensor | tuple[torch.Tensor, list]:
         """
         前向传播
         Args:
             input_ids: 输入 token ID 张量,形状为 (batch_size, seq_length)
-            attention_mask: 可选的注意力掩码张量,形状为 (batch_size, seq_length, seq_length),1 表示有效位置,0 表示填充位置
+            attention_mask: 可选的注意力掩码张量,形状为 (batch_size, seq_length, seq_length),True 表示需要 mask
+            return_attention_weights: 是否返回每层的注意力权重
         Returns:
             torch.Tensor: 输出 logits 张量,形状为 (batch_size, seq_length, vocab_size)
+            如果 return_attention_weights=True，返回 (logits, list_of_attn_weights)
         """
         # 1. Embedding
         # (batch_size, seq_length) -> (batch_size, seq_length, embedding_dim)
         x = self.embedding(input_ids)
 
         # 2. Transformer Blocks
-        # (batch_size, seq_length, embedding_dim) -> (batch_size, seq_length, embedding_dim)
+        all_attn_weights = []
         for block in self.transformer_blocks:
-            x = block(x, attention_mask)
+            result = block(
+                x, attention_mask, return_attention_weights=return_attention_weights
+            )
+            if return_attention_weights:
+                x, attn_weights = result
+                all_attn_weights.append(attn_weights)
+            else:
+                x = result
 
         # 3. Final Layer Normalization (仅 Pre-Norm)
-        # (batch_size, seq_length, embedding_dim) -> (batch_size, seq_length, embedding_dim)
         x = self.final_norm(x)
 
         # 4. Language Modeling Head
-        # (batch_size, seq_length, embedding_dim) -> (batch_size, seq_length, vocab_size)
         logits = self.language_modeling_head(x)
 
+        if return_attention_weights:
+            return logits, all_attn_weights
         return logits
 
     def get_num_params(self, non_embedding: bool = False) -> int:
