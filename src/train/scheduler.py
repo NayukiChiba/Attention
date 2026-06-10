@@ -17,7 +17,7 @@ from torch.optim.lr_scheduler import (
 from config.defaults import TrainingConfig
 
 
-def createScheduler(
+def create_scheduler(
     optimizer: optim.Optimizer, training_config: TrainingConfig
 ) -> LambdaLR | CosineAnnealingLR | StepLR | ExponentialLR | None:
     """
@@ -153,7 +153,7 @@ if __name__ == "__main__":
 
         # 创建优化器和调度器
         optimizer = optim.Adam(model.parameters(), lr=training_config.learning_rate)
-        scheduler = createScheduler(optimizer, training_config)
+        scheduler = create_scheduler(optimizer, training_config)
 
         if scheduler is None:
             print("调度器类型: None (constant)")
@@ -168,7 +168,7 @@ if __name__ == "__main__":
         for step in steps:
             # 重置优化器
             optimizer = optim.Adam(model.parameters(), lr=training_config.learning_rate)
-            scheduler = createScheduler(optimizer, training_config)
+            scheduler = create_scheduler(optimizer, training_config)
 
             # 更新到指定步数
             for _ in range(step):
@@ -181,7 +181,7 @@ if __name__ == "__main__":
         # 打印学习率曲线(ASCII 图表)
         print("\n学习率变化曲线(每 50 步采样):")
         optimizer = optim.Adam(model.parameters(), lr=training_config.learning_rate)
-        scheduler = createScheduler(optimizer, training_config)
+        scheduler = create_scheduler(optimizer, training_config)
 
         for i in range(0, 501, 50):
             if i > 0:
@@ -232,7 +232,7 @@ if __name__ == "__main__":
         )
 
         optimizer = optim.Adam(model.parameters(), lr=training_config.learning_rate)
-        scheduler = createScheduler(optimizer, training_config)
+        scheduler = create_scheduler(optimizer, training_config)
 
         lrs = []
         for step in range(1001):
@@ -267,7 +267,7 @@ if __name__ == "__main__":
     optimizer = optim.Adam(model.parameters(), lr=1e-3)
 
     try:
-        createScheduler(optimizer, training_config_invalid)
+        create_scheduler(optimizer, training_config_invalid)
         print("❌ 应该抛出 ValueError")
     except ValueError as e:
         print(f"正确捕获异常: {e}")
