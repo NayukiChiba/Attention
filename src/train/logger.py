@@ -216,6 +216,17 @@ class Logger:
 
         self.info("=" * 80)
 
+        # 写入 TensorBoard（按 epoch 记录）
+        if self.writer is not None:
+            for key, value in train_metrics.items():
+                if isinstance(value, (int, float)):
+                    self.writer.add_scalar(f"epoch/train_{key}", value, epoch)
+
+            if val_metrics:
+                for key, value in val_metrics.items():
+                    if isinstance(value, (int, float)):
+                        self.writer.add_scalar(f"epoch/val_{key}", value, epoch)
+
     def log_config(self, config) -> None:
         """
         记录配置信息

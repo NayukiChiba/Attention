@@ -168,6 +168,7 @@ class Trainer:
             self.logger.log_metrics(
                 step=self.global_step,
                 metrics={
+                    "epoch": self.current_epoch,
                     "loss": loss.item(),
                     "ppl": ppl,
                     "lr": current_lr,
