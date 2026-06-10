@@ -146,8 +146,8 @@ class TrainingConfig:
     seed: int = 42
     # 训练设备
     device: str = "cuda" if torch.cuda.is_available() else "cpu"
-    # DataLoader 线程数
-    num_workers: int = 4
+    # DataLoader 线程数（Windows 建议 0-2）
+    num_workers: int = 0
 
     # === 优化器 ===
     # 优化器类型

@@ -144,14 +144,33 @@ def create_dataloader(
         block_size=gpt_config.context_length,
     )
 
+    # 判断设备类型，CUDA 时启用 pin_memory 加速 CPU -> GPU 传输
+    device_type = training_config.device.split(":")[0]
+    pin_memory = device_type == "cuda"
+
     train_loader = torch.utils.data.DataLoader(
-        train_dataset, batch_size=training_config.batch_size, shuffle=True
+        train_dataset,
+        batch_size=training_config.batch_size,
+        shuffle=True,
+        num_workers=training_config.num_workers,
+        pin_memory=pin_memory,
+        persistent_workers=training_config.num_workers > 0,
     )
     val_loader = torch.utils.data.DataLoader(
-        val_dataset, batch_size=training_config.batch_size, shuffle=False
+        val_dataset,
+        batch_size=training_config.batch_size,
+        shuffle=False,
+        num_workers=training_config.num_workers,
+        pin_memory=pin_memory,
+        persistent_workers=training_config.num_workers > 0,
     )
     test_loader = torch.utils.data.DataLoader(
-        test_dataset, batch_size=training_config.batch_size, shuffle=False
+        test_dataset,
+        batch_size=training_config.batch_size,
+        shuffle=False,
+        num_workers=training_config.num_workers,
+        pin_memory=pin_memory,
+        persistent_workers=training_config.num_workers > 0,
     )
 
     return train_loader, val_loader, test_loader

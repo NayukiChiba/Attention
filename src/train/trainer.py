@@ -81,6 +81,15 @@ class Trainer:
         # 模型移动到设备
         self.model.to(config.device)
 
+        # 如果使用 CUDA，强制唤醒 GPU
+        if config.device == "cuda":
+            dummy = torch.randn(3000, 3000, device=config.device)
+            for _ in range(5):
+                dummy = dummy @ dummy
+            torch.cuda.synchronize()
+            del dummy
+            self.logger.info("GPU 已唤醒")
+
         # 创建优化器和调度器
         self.optimizer = create_optimizer(model, config)
         self.scheduler = create_scheduler(self.optimizer, config)
@@ -115,32 +124,42 @@ class Trainer:
         total_loss = 0.0
         num_batches = len(self.train_loader)
 
+        # 自动混合精度（AMP）加速训练
+        use_amp = self.config.device == "cuda"
+        scaler = torch.amp.GradScaler("cuda") if use_amp else None
+
         pbar = tqdm(self.train_loader, desc=f"[Train] Epoch {self.current_epoch}")
 
         for batch in pbar:
             # 获取输入和目标（dataset 返回 (input_ids, target_ids) 元组）
             input_ids, target_ids = batch
-            input_ids = input_ids.to(self.config.device)
-            target_ids = target_ids.to(self.config.device)
+            input_ids = input_ids.to(self.config.device, non_blocking=True)
+            target_ids = target_ids.to(self.config.device, non_blocking=True)
 
-            # 前向传播
-            logits = self.model(input_ids)
+            # 前向传播 + 反向传播
+            self.optimizer.zero_grad(set_to_none=True)
 
-            # 计算损失
-            loss = nn.functional.cross_entropy(
-                logits.view(-1, logits.size(-1)),
-                target_ids.view(-1),
-            )
-
-            # 反向传播
-            self.optimizer.zero_grad()
-            loss.backward()
-
-            # 梯度裁剪
-            grad_norm = clip_gradients(self.model, self.config.grad_clip)
-
-            # 更新参数
-            self.optimizer.step()
+            if use_amp:
+                with torch.amp.autocast("cuda"):
+                    logits = self.model(input_ids)
+                    loss = nn.functional.cross_entropy(
+                        logits.view(-1, logits.size(-1)),
+                        target_ids.view(-1),
+                    )
+                scaler.scale(loss).backward()
+                scaler.unscale_(self.optimizer)
+                grad_norm = clip_gradients(self.model, self.config.grad_clip)
+                scaler.step(self.optimizer)
+                scaler.update()
+            else:
+                logits = self.model(input_ids)
+                loss = nn.functional.cross_entropy(
+                    logits.view(-1, logits.size(-1)),
+                    target_ids.view(-1),
+                )
+                loss.backward()
+                grad_norm = clip_gradients(self.model, self.config.grad_clip)
+                self.optimizer.step()
 
             # 更新学习率
             if self.scheduler is not None:
@@ -154,15 +173,14 @@ class Trainer:
             current_lr = self.optimizer.param_groups[0]["lr"]
             ppl = torch.exp(loss).item()
 
-            # 更新进度条
-            pbar.set_postfix(
-                {
-                    "loss": f"{loss.item():.4f}",
-                    "ppl": f"{ppl:.4f}",
-                    "lr": f"{current_lr:.6f}",
-                    "grad_norm": f"{grad_norm:.4f}",
-                }
-            )
+            # 更新进度条（每 10 步更新一次）
+            if self.global_step % 10 == 0:
+                pbar.set_postfix(
+                    loss=f"{loss.item():.4f}",
+                    ppl=f"{ppl:.4f}",
+                    lr=f"{current_lr:.2e}",
+                    grad=f"{grad_norm:.4f}",
+                )
 
             # 记录到 logger
             self.logger.log_metrics(
