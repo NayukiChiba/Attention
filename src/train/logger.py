@@ -167,7 +167,8 @@ class Logger:
         else:
             message = f"Step {step:6d} | {metrics_str}"
 
-        self.info(message)
+        # 使用 debug 级别，步级指标仅写入文件，不刷控制台
+        self.debug(message)
 
         # 写入 TensorBoard
         if self.writer is not None:
