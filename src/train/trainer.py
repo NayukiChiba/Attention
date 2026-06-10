@@ -118,15 +118,13 @@ class Trainer:
         pbar = tqdm(self.train_loader, desc=f"[Train] Epoch {self.current_epoch}")
 
         for batch in pbar:
-            # 获取输入和目标
-            input_ids = batch["input_ids"].to(self.config.device)
-            target_ids = batch["target_ids"].to(self.config.device)
-            attention_mask = batch.get("attention_mask", None)
-            if attention_mask is not None:
-                attention_mask = attention_mask.to(self.config.device)
+            # 获取输入和目标（dataset 返回 (input_ids, target_ids) 元组）
+            input_ids, target_ids = batch
+            input_ids = input_ids.to(self.config.device)
+            target_ids = target_ids.to(self.config.device)
 
             # 前向传播
-            logits = self.model(input_ids, attention_mask)
+            logits = self.model(input_ids)
 
             # 计算损失
             loss = nn.functional.cross_entropy(
@@ -197,15 +195,13 @@ class Trainer:
 
         with torch.no_grad():
             for batch in pbar:
-                # 获取输入和目标
-                input_ids = batch["input_ids"].to(self.config.device)
-                target_ids = batch["target_ids"].to(self.config.device)
-                attention_mask = batch.get("attention_mask", None)
-                if attention_mask is not None:
-                    attention_mask = attention_mask.to(self.config.device)
+                # 获取输入和目标（dataset 返回 (input_ids, target_ids) 元组）
+                input_ids, target_ids = batch
+                input_ids = input_ids.to(self.config.device)
+                target_ids = target_ids.to(self.config.device)
 
                 # 前向传播
-                logits = self.model(input_ids, attention_mask)
+                logits = self.model(input_ids)
 
                 # 计算损失
                 loss = nn.functional.cross_entropy(
@@ -329,6 +325,51 @@ class Trainer:
 
         self.logger.info("=" * 80)
         self.logger.info("训练完成")
+
+        # 生成训练可视化图表
+        self._saveVisualizations()
+
         self.logger.close()
 
         return self.history
+
+    def _saveVisualizations(self) -> None:
+        """保存训练曲线和注意力权重热力图"""
+        from src.evaluate.visualize import plot_attention_heatmap, plot_training_curves
+
+        # 1. 训练曲线
+        self.logger.info("正在生成训练曲线...")
+        plot_training_curves(
+            self.history,
+            save_path=paths.FIGURES_DIR / "training_curves.png",
+        )
+
+        # 2. 注意力权重热力图
+        self.logger.info("正在生成注意力热力图...")
+        self.model.eval()
+        try:
+            # 取一个验证集样本
+            sample_batch = next(iter(self.val_loader))
+            input_ids, _ = sample_batch
+            input_ids = input_ids[:1].to(self.config.device)  # 只取第一个样本
+
+            with torch.no_grad():
+                # 前向传播获取注意力权重
+                _, attn_weights = self.model(input_ids, return_attention_weights=True)
+                # attn_weights 是 list of (batch, num_heads, seq_len, seq_len)
+                # 取最后一层的注意力权重
+                last_layer_attn = attn_weights[-1][0]  # (num_heads, seq_len, seq_len)
+
+            # 画前几个头的热力图
+            num_heads_to_plot = min(4, last_layer_attn.shape[0])
+            actual_seq_len = input_ids.shape[1]
+
+            for h in range(num_heads_to_plot):
+                save_path = paths.FIGURES_DIR / f"attention_head_{h}.png"
+                plot_attention_heatmap(
+                    last_layer_attn[h, :actual_seq_len, :actual_seq_len].cpu().numpy(),
+                    save_path=save_path,
+                )
+
+        except Exception as e:
+            self.logger.warning(f"注意力热力图生成失败: {e}")
