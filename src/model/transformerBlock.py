@@ -74,22 +74,39 @@ class TransformerBlock(nn.Module):
         # dropout层（可选）
         self.dropout = nn.Dropout(dropout_rate)
 
-    def forward(self, x: torch.Tensor, mask: torch.Tensor = None) -> torch.Tensor:
+    def forward(
+        self,
+        x: torch.Tensor,
+        mask: torch.Tensor = None,
+        return_attention_weights: bool = False,
+    ) -> torch.Tensor | tuple[torch.Tensor, torch.Tensor]:
         """
         前向传播计算Transformer Block的输出
         Args:
             x: 输入张量 (batch_size, seq_length, embedding_dim)
             mask: 可选的mask张量 (batch_size, seq_length_q, seq_length_k)
+            return_attention_weights: 是否返回注意力权重
         Returns:
             输出张量 (batch_size, seq_length, embedding_dim)
+            如果 return_attention_weights=True，返回 (output, attention_weights)
         """
+        attn_weights = None
+
         if self.norm_type == "pre":
             # Pre-Norm: LayerNorm -> SubLayer -> Residual
             # 多头注意力 + 残差连接
             normed_x = self.norm1(x)
-            attention_output = self.attention(
-                query=normed_x, key=normed_x, value=normed_x, mask=mask
+            attn_result = self.attention(
+                query=normed_x,
+                key=normed_x,
+                value=normed_x,
+                mask=mask,
+                return_attention_weights=return_attention_weights,
             )
+            if return_attention_weights:
+                attention_output, attn_weights = attn_result
+            else:
+                attention_output = attn_result
             x = x + attention_output
 
             # 前馈网络 + 残差连接
@@ -98,12 +115,23 @@ class TransformerBlock(nn.Module):
             x = x + self.dropout(ffn_output)
         else:
             # Post-Norm: SubLayer -> Residual -> LayerNorm
-            # Post-Norm 结构
-            attention_output = self.attention(query=x, key=x, value=x, mask=mask)
+            attn_result = self.attention(
+                query=x,
+                key=x,
+                value=x,
+                mask=mask,
+                return_attention_weights=return_attention_weights,
+            )
+            if return_attention_weights:
+                attention_output, attn_weights = attn_result
+            else:
+                attention_output = attn_result
             x = self.norm1(x + self.dropout(attention_output))
             ffn_output = self.ffn(x)
             x = self.norm2(x + self.dropout(ffn_output))
 
+        if return_attention_weights:
+            return x, attn_weights
         return x
 
 
