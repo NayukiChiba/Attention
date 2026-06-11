@@ -103,13 +103,18 @@ class TextGenerator:
             if temperature > 0 and temperature != 1.0:
                 next_token_logits = next_token_logits / temperature
 
-            # 重复惩罚：降低已生成 token 的 logits，减少循环重复
+            # 重复惩罚：降低已出现 token 的概率
             if self.config.repetition_penalty != 1.0:
-                for tokenId in set(input_ids[0].tolist()):
-                    if next_token_logits[0, tokenId] < 0:
-                        next_token_logits[0, tokenId] *= self.config.repetition_penalty
+                for token_id in set(input_ids[0].tolist()):
+                    if next_token_logits[0, token_id] < 0:
+                        next_token_logits[0, token_id] *= self.config.repetition_penalty
                     else:
-                        next_token_logits[0, tokenId] /= self.config.repetition_penalty
+                        next_token_logits[0, token_id] /= self.config.repetition_penalty
+
+            # 连续重复检测：如果最近 3 个 token 都相同，强制排除
+            recent_ids = input_ids[0, -3:].tolist()
+            if len(set(recent_ids)) == 1:
+                next_token_logits[0, recent_ids[0]] = float("-inf")
 
             # Top-K 过滤
             if top_k > 0:
@@ -119,13 +124,11 @@ class TextGenerator:
             if top_p < 1.0:
                 next_token_logits = self._top_p_filtering(next_token_logits, top_p)
 
-            # 采样或贪心解码
+            # 采样
             if temperature > 0:
-                # Multinomial 采样
                 probs = torch.softmax(next_token_logits, dim=-1)
                 next_token = torch.multinomial(probs, num_samples=1)
             else:
-                # 贪心解码 (temperature = 0)
                 next_token = torch.argmax(next_token_logits, dim=-1, keepdim=True)
 
             # 拼接到输入序列
