@@ -24,6 +24,12 @@ def plot_training_curves(
     """
     fig, axes = plt.subplots(1, 2, figsize=(12, 4))
 
+    # 空数据直接返回
+    if not history.get("train_loss"):
+        print("警告: 训练历史为空，跳过绘图")
+        plt.close(fig)
+        return
+
     # x 轴优先用 steps，没有则用 epoch 编号
     if history.get("steps") and len(history["steps"]) == len(history["train_loss"]):
         xVals = history["steps"]

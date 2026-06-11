@@ -115,6 +115,15 @@ class Trainer:
             "steps": [],  # 每个 val 点对应的 step
         }
 
+        # 按 step 级别的历史（用于可视化，每 100 步记录）
+        self.step_history = {
+            "steps": [],
+            "train_loss": [],
+            "train_ppl": [],
+            "val_loss": [],
+            "val_ppl": [],
+        }
+
     def train_epoch(self) -> tuple[float, float, bool]:
         """
         训练一个 epoch,每 100 步验证并保存检查点
@@ -202,6 +211,13 @@ class Trainer:
             # 每 100 步验证并保存检查点
             if self.global_step % 100 == 0:
                 val_loss, val_ppl = self._validate()
+
+                # 记录到 step 级历史（用于可视化）
+                self.step_history["steps"].append(self.global_step)
+                self.step_history["train_loss"].append(loss.item())
+                self.step_history["train_ppl"].append(ppl)
+                self.step_history["val_loss"].append(val_loss)
+                self.step_history["val_ppl"].append(val_ppl)
 
                 # 记录验证指标到日志
                 self.logger.log_epoch(
@@ -365,10 +381,14 @@ class Trainer:
         """保存训练曲线和注意力权重热力图"""
         from src.evaluate.visualize import plot_attention_heatmap, plot_training_curves
 
-        # 1. 训练曲线
+        # 1. 训练曲线（优先用 step 级数据）
         self.logger.info("正在生成训练曲线...")
+        if self.step_history["steps"]:
+            plotData = self.step_history
+        else:
+            plotData = self.history
         plot_training_curves(
-            self.history,
+            plotData,
             save_path=paths.FIGURES_DIR / "training_curves.png",
         )
 
