@@ -19,26 +19,32 @@ def plot_training_curves(
     绘制训练和验证的 loss 和 perplexity 曲线
 
     Args:
-        history: 训练历史字典，包含 train_loss, train_ppl, val_loss, val_ppl
+        history: 训练历史字典，包含 train_loss, train_ppl, val_loss, val_ppl, steps(可选)
         save_path: 保存路径
     """
     fig, axes = plt.subplots(1, 2, figsize=(12, 4))
 
-    epochs = range(1, len(history["train_loss"]) + 1)
+    # x 轴优先用 steps，没有则用 epoch 编号
+    if history.get("steps") and len(history["steps"]) == len(history["train_loss"]):
+        xVals = history["steps"]
+        xLabel = "Step"
+    else:
+        xVals = list(range(1, len(history["train_loss"]) + 1))
+        xLabel = "Epoch"
 
     # 绘制 Loss 曲线
-    axes[0].plot(epochs, history["train_loss"], label="Train Loss", color="blue")
-    axes[0].plot(epochs, history["val_loss"], label="Val Loss", color="orange")
-    axes[0].set_xlabel("Epoch")
+    axes[0].plot(xVals, history["train_loss"], label="Train Loss", color="blue")
+    axes[0].plot(xVals, history["val_loss"], label="Val Loss", color="orange")
+    axes[0].set_xlabel(xLabel)
     axes[0].set_ylabel("Loss")
     axes[0].set_title("Training and Validation Loss")
     axes[0].legend()
     axes[0].grid(True, alpha=0.3)
 
     # 绘制 Perplexity 曲线
-    axes[1].plot(epochs, history["train_ppl"], label="Train PPL", color="blue")
-    axes[1].plot(epochs, history["val_ppl"], label="Val PPL", color="orange")
-    axes[1].set_xlabel("Epoch")
+    axes[1].plot(xVals, history["train_ppl"], label="Train PPL", color="blue")
+    axes[1].plot(xVals, history["val_ppl"], label="Val PPL", color="orange")
+    axes[1].set_xlabel(xLabel)
     axes[1].set_ylabel("Perplexity")
     axes[1].set_title("Training and Validation Perplexity")
     axes[1].legend()
