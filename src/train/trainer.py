@@ -201,15 +201,12 @@ class Trainer:
             if self.global_step % 100 == 0:
                 val_loss, val_ppl = self._validate()
 
-                # 记录验证指标
+                # 记录验证指标到日志
                 self.logger.log_epoch(
                     epoch=self.current_epoch,
                     train_metrics={"loss": loss.item(), "ppl": ppl},
                     val_metrics={"loss": val_loss, "ppl": val_ppl},
                 )
-
-                self.history["val_loss"].append(val_loss)
-                self.history["val_ppl"].append(val_ppl)
 
                 # 早停检查
                 is_improved = self.early_stopping(
@@ -337,9 +334,14 @@ class Trainer:
             # 训练一个 epoch(每 100 步内部验证和保存)
             train_loss, train_ppl, should_stop = self.train_epoch()
 
+            # epoch 结束时验证并记录（用于可视化）
+            val_loss, val_ppl = self._validate()
+
             # 记录 epoch 历史
             self.history["train_loss"].append(train_loss)
             self.history["train_ppl"].append(train_ppl)
+            self.history["val_loss"].append(val_loss)
+            self.history["val_ppl"].append(val_ppl)
 
             # 早停检查
             if should_stop:
