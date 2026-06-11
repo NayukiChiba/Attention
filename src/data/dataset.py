@@ -70,48 +70,61 @@ class NewsDataset(Dataset):
 
     def __getitem__(self, idx) -> Tuple[torch.Tensor, torch.Tensor]:
         """
-        返回第 idx 个样本的输入序列和目标序列（实时编码）
+        返回第 idx 个样本的输入序列和目标序列（实时编码，随机长度）
 
-        处理逻辑:
-        1. 取出第 idx 篇新闻文本
-        2. 实时编码为 token ids
-        3. 如果文本过长 (> block_size+1): 随机截取一段，增加训练多样性
-        4. 如果文本过短 (< block_size+1): 用 <PAD> 填充到固定长度
-        5. 切分为 input 和 target: input = ids[:-1], target = ids[1:] (右移)
-
-        示例 (block_size=4):
-            token_ids = [10, 20, 30, 40, 50]  (共5个token)
-            input_ids  = [10, 20, 30, 40]     (前4个)
-            target_ids = [20, 30, 40, 50]     (后4个，相当于input右移1位)
-
-        这样模型学习: 看到 [10, 20, 30] 预测 30, 看到 [10, 20, 30, 40] 预测 50
-
-        Returns:
-            Tuple[torch.Tensor, torch.Tensor]: (input_ids, target_ids)
+        使用随机序列长度训练，让模型适应短上下文（生成时 prompt 可能很短）
         """
+        import random
+
         # 1. 取出原始文本
         text = self.texts[idx]
 
         # 2. 实时编码为 token ids
         token_ids = self.tokenizer.encode(text)
 
-        # 3. 如果文本过长，随机截取一段 (block_size + 1 个token)
-        if len(token_ids) > self.block_size + 1:
-            import random
+        # 3. 随机序列长度（最短 8 token，让模型学会处理短序列）
+        min_len = max(8, self.block_size // 16)
+        max_len = min(self.block_size + 1, len(token_ids))
+        if max_len <= min_len:
+            chunk_len = max_len
+        else:
+            chunk_len = random.randint(min_len, max_len)
 
-            max_start = len(token_ids) - self.block_size - 1
+        # 4. 随机截取一段
+        if len(token_ids) > chunk_len:
+            max_start = len(token_ids) - chunk_len
             start = random.randint(0, max_start)
-            token_ids = token_ids[start : start + self.block_size + 1]
+            token_ids = token_ids[start : start + chunk_len]
 
-        # 4. 如果不够长，用 PAD 填充到 block_size + 1
-        if len(token_ids) < self.block_size + 1:
+        # 5. 如果不够长，用 PAD 填充
+        if len(token_ids) < chunk_len and chunk_len <= self.block_size + 1:
             pad_id = self.tokenizer.pad_token_id
-            token_ids = token_ids + [pad_id] * (self.block_size + 1 - len(token_ids))
+            token_ids = token_ids + [pad_id] * (chunk_len - len(token_ids))
 
-        # 5. 切分为输入和目标 (target 是 input 右移一位)
-        input_ids = torch.tensor(token_ids[:-1], dtype=torch.long)  # 前 block_size 个
-        target_ids = torch.tensor(token_ids[1:], dtype=torch.long)  # 后 block_size 个
+        # 6. 切分为输入和目标 (target 是 input 右移一位)
+        input_ids = torch.tensor(token_ids[:-1], dtype=torch.long)
+        target_ids = torch.tensor(token_ids[1:], dtype=torch.long)
         return input_ids, target_ids
+
+
+def collateBatch(batch: list, pad_id: int = 0) -> Tuple[torch.Tensor, torch.Tensor]:
+    """将不等长序列 padding 到相同长度"""
+    inputs, targets = zip(*batch)
+    maxLen = max(x.shape[0] for x in inputs)
+
+    paddedInputs = []
+    paddedTargets = []
+    for inp, tgt in zip(inputs, targets):
+        curLen = inp.shape[0]
+        if curLen < maxLen:
+            pad = torch.full((maxLen - curLen,), pad_id, dtype=torch.long)
+            paddedInputs.append(torch.cat([inp, pad]))
+            paddedTargets.append(torch.cat([tgt, pad]))
+        else:
+            paddedInputs.append(inp)
+            paddedTargets.append(tgt)
+
+    return torch.stack(paddedInputs), torch.stack(paddedTargets)
 
 
 def create_dataloader(
@@ -155,6 +168,7 @@ def create_dataloader(
         num_workers=training_config.num_workers,
         pin_memory=pin_memory,
         persistent_workers=training_config.num_workers > 0,
+        collate_fn=collateBatch,
     )
     val_loader = torch.utils.data.DataLoader(
         val_dataset,
@@ -163,6 +177,7 @@ def create_dataloader(
         num_workers=training_config.num_workers,
         pin_memory=pin_memory,
         persistent_workers=training_config.num_workers > 0,
+        collate_fn=collateBatch,
     )
     test_loader = torch.utils.data.DataLoader(
         test_dataset,
@@ -171,6 +186,7 @@ def create_dataloader(
         num_workers=training_config.num_workers,
         pin_memory=pin_memory,
         persistent_workers=training_config.num_workers > 0,
+        collate_fn=collateBatch,
     )
 
     return train_loader, val_loader, test_loader
