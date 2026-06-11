@@ -37,9 +37,7 @@ class TokenEmbedding(nn.Module):
         """
         # 标准做法: 乘以 sqrt(embedding_dim),放大嵌入向量
         # 原因: 位置编码的数值尺度匹配(位置编码用 sin/cos,范围在 [-1, 1])
-        return self.embedding(input_ids) * torch.sqrt(
-            torch.tensor(self.embedding_dim, dtype=torch.float32)
-        )
+        return self.embedding(input_ids) * (self.embedding_dim**0.5)
 
 
 class GPTEmbedding(nn.Module):

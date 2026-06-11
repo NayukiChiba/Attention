@@ -77,10 +77,22 @@ class TextGenerator:
 
         # 编码输入
         input_ids = self.tokenizer.encode(prompt)
+
+        # 获取模型的上下文长度
+        context_length = self.model.config.context_length
+
+        # 如果 prompt 超过上下文长度，只保留最后的 token
+        if len(input_ids) > context_length:
+            input_ids = input_ids[-context_length:]
+
         input_ids = torch.tensor([input_ids], dtype=torch.long, device=self.device)
 
         # 生成循环
         for _ in range(max_new_tokens):
+            # 如果序列超过上下文长度，只保留最后 context_length 个 token
+            if input_ids.shape[1] > context_length:
+                input_ids = input_ids[:, -context_length:]
+
             # 前向传播
             logits = self.model(input_ids)  # (batch_size, seq_len, vocab_size)
 
