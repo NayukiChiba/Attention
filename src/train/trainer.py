@@ -81,7 +81,7 @@ class Trainer:
         # 模型移动到设备
         self.model.to(config.device)
 
-        # 如果使用 CUDA，强制唤醒 GPU
+        # 如果使用 CUDA,强制唤醒 GPU
         if config.device == "cuda":
             dummy = torch.randn(3000, 3000, device=config.device)
             for _ in range(5):
@@ -113,25 +113,25 @@ class Trainer:
             "val_ppl": [],
         }
 
-    def train_epoch(self) -> tuple[float, float]:
+    def train_epoch(self) -> tuple[float, float, bool]:
         """
-        训练一个 epoch
+        训练一个 epoch,每 100 步验证并保存检查点
 
         Returns:
-            tuple[float, float]: (平均损失, 平均困惑度)
+            tuple[float, float, bool]: (平均损失, 平均困惑度, 是否早停)
         """
         self.model.train()
         total_loss = 0.0
         num_batches = len(self.train_loader)
 
-        # 自动混合精度（AMP）加速训练
+        # 自动混合精度(AMP)加速训练
         use_amp = self.config.device == "cuda"
         scaler = torch.amp.GradScaler("cuda") if use_amp else None
 
         pbar = tqdm(self.train_loader, desc=f"[Train] Epoch {self.current_epoch}")
 
         for batch in pbar:
-            # 获取输入和目标（dataset 返回 (input_ids, target_ids) 元组）
+            # 获取输入和目标(dataset 返回 (input_ids, target_ids) 元组)
             input_ids, target_ids = batch
             input_ids = input_ids.to(self.config.device, non_blocking=True)
             target_ids = target_ids.to(self.config.device, non_blocking=True)
@@ -175,7 +175,7 @@ class Trainer:
             current_lr = self.optimizer.param_groups[0]["lr"]
             ppl = torch.exp(loss).item()
 
-            # 更新进度条（每 10 步更新一次）
+            # 更新进度条(每 10 步更新一次)
             if self.global_step % 10 == 0:
                 pbar.set_postfix(
                     loss=f"{loss.item():.4f}",
@@ -197,54 +197,77 @@ class Trainer:
                 prefix="train",
             )
 
+            # 每 100 步验证并保存检查点
+            if self.global_step % 100 == 0:
+                val_loss, val_ppl = self._validate()
+
+                # 记录验证指标
+                self.logger.log_epoch(
+                    epoch=self.current_epoch,
+                    train_metrics={"loss": loss.item(), "ppl": ppl},
+                    val_metrics={"loss": val_loss, "ppl": val_ppl},
+                )
+
+                self.history["val_loss"].append(val_loss)
+                self.history["val_ppl"].append(val_ppl)
+
+                # 早停检查
+                is_improved = self.early_stopping(
+                    val_loss=val_loss,
+                    train_loss=loss.item(),
+                    epoch=self.current_epoch,
+                )
+
+                # 保存最佳模型
+                if is_improved:
+                    self.save_checkpoint(paths.BEST_MODEL_PATH)
+                    self.logger.info(
+                        f"保存最佳模型: step={self.global_step}, val_loss={val_loss:.4f}"
+                    )
+
+                # 保存最新模型(每 100 步)
+                self.save_checkpoint(paths.LAST_MODEL_PATH)
+                self.logger.info(f"保存最新模型: step={self.global_step}")
+
+                # 早停检查
+                if self.early_stopping.should_stop:
+                    return (
+                        total_loss / num_batches,
+                        torch.exp(torch.tensor(total_loss / num_batches)).item(),
+                        True,
+                    )
+
+                # 切回训练模式
+                self.model.train()
+
         avg_loss = total_loss / num_batches
         avg_ppl = torch.exp(torch.tensor(avg_loss)).item()
-        return avg_loss, avg_ppl
+        return avg_loss, avg_ppl, False
 
-    def val_epoch(self) -> tuple[float, float]:
-        """
-        验证一个 epoch
-
-        Returns:
-            tuple[float, float]: (平均损失, 平均困惑度)
-        """
+    def _validate(self, max_batches: int = 100) -> tuple[float, float]:
+        """快速验证(取前 max_batches 个 batch,约 3 秒完成)"""
         self.model.eval()
         total_loss = 0.0
-        num_batches = len(self.val_loader)
-
-        pbar = tqdm(self.val_loader, desc=f"[VAL] Epoch {self.current_epoch}")
+        count = 0
 
         with torch.no_grad():
-            for batch in pbar:
-                # 获取输入和目标（dataset 返回 (input_ids, target_ids) 元组）
+            for batch_idx, batch in enumerate(self.val_loader):
+                if batch_idx >= max_batches:
+                    break
                 input_ids, target_ids = batch
                 input_ids = input_ids.to(self.config.device)
                 target_ids = target_ids.to(self.config.device)
 
-                # 前向传播
                 logits = self.model(input_ids)
-
-                # 计算损失
                 loss = nn.functional.cross_entropy(
                     logits.view(-1, logits.size(-1)),
                     target_ids.view(-1),
-                    ignore_index=0,  # 忽略 PAD token (id=0)
+                    ignore_index=0,
                 )
-
                 total_loss += loss.item()
+                count += 1
 
-                # 计算困惑度
-                ppl = torch.exp(loss).item()
-
-                # 更新进度条
-                pbar.set_postfix(
-                    {
-                        "loss": f"{loss.item():.4f}",
-                        "ppl": f"{ppl:.4f}",
-                    }
-                )
-
-        avg_loss = total_loss / num_batches
+        avg_loss = total_loss / count
         avg_ppl = torch.exp(torch.tensor(avg_loss)).item()
         return avg_loss, avg_ppl
 
@@ -264,6 +287,7 @@ class Trainer:
             step=self.global_step,
             loss=self.history["val_loss"][-1] if self.history["val_loss"] else 0.0,
             checkpoint_path=checkpoint_path,
+            config=self.model.config,
             **kwargs,
         )
 
@@ -289,6 +313,8 @@ class Trainer:
         """
         完整训练流程
 
+        每 100 步验证一次并保存检查点(best + last),不再按 epoch 保存
+
         Args:
             resume_from: 恢复训练的检查点路径
 
@@ -302,46 +328,21 @@ class Trainer:
         self.logger.info("开始训练")
         self.logger.info("=" * 80)
 
+        best_val_loss = float("inf")
+
         # 训练循环
         for epoch in range(self.current_epoch, self.config.max_epochs + 1):
             self.current_epoch = epoch
 
-            # 训练一个 epoch
-            train_loss, train_ppl = self.train_epoch()
+            # 训练一个 epoch(每 100 步内部验证和保存)
+            train_loss, train_ppl, should_stop = self.train_epoch()
 
-            # 验证一个 epoch
-            val_loss, val_ppl = self.val_epoch()
-
-            # 记录 epoch 信息
-            self.logger.log_epoch(
-                epoch=epoch,
-                train_metrics={"loss": train_loss, "ppl": train_ppl},
-                val_metrics={"loss": val_loss, "ppl": val_ppl},
-            )
-
-            # 保存历史
+            # 记录 epoch 历史
             self.history["train_loss"].append(train_loss)
             self.history["train_ppl"].append(train_ppl)
-            self.history["val_loss"].append(val_loss)
-            self.history["val_ppl"].append(val_ppl)
 
             # 早停检查
-            is_improved = self.early_stopping(
-                val_loss=val_loss,
-                train_loss=train_loss,
-                epoch=epoch,
-            )
-
-            # 保存最佳模型
-            if is_improved:
-                self.save_checkpoint(paths.BEST_MODEL_PATH)
-                self.logger.info(f"保存最佳模型: {paths.BEST_MODEL_PATH}")
-
-            # 保存最新模型
-            self.save_checkpoint(paths.LAST_MODEL_PATH)
-
-            # 检查早停
-            if self.early_stopping.should_stop:
+            if should_stop:
                 self.logger.info(f"触发早停: {self.early_stopping.stop_reason}")
                 break
 
