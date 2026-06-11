@@ -209,8 +209,8 @@ def train_main(args):
 def eval_main(args):
     """评估入口"""
 
-    # 1. 加载检查点
-    checkpoint_path = Path(args.checkpoint)
+    # 1. 加载检查点（文件名自动拼到 checkpoints 目录）
+    checkpoint_path = paths.CHECKPOINTS_DIR / args.checkpoint
     if not checkpoint_path.exists():
         print(f"检查点文件不存在: {checkpoint_path}")
         sys.exit(1)
@@ -266,8 +266,8 @@ def eval_main(args):
 def generate_main(args):
     """生成入口"""
 
-    # 1. 加载检查点
-    checkpoint_path = Path(args.checkpoint)
+    # 1. 加载检查点（文件名自动拼到 checkpoints 目录）
+    checkpoint_path = paths.CHECKPOINTS_DIR / args.checkpoint
     if not checkpoint_path.exists():
         print(f"检查点文件不存在: {checkpoint_path}")
         sys.exit(1)
