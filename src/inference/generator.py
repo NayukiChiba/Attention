@@ -75,8 +75,8 @@ class TextGenerator:
         top_k = top_k if top_k is not None else self.config.top_k
         top_p = top_p if top_p is not None else self.config.top_p
 
-        # 编码输入
-        input_ids = self.tokenizer.encode(prompt)
+        # 编码输入（只加 BOS，不加 EOS，否则模型会立即结束生成）
+        input_ids = self.tokenizer.encode(prompt, add_eos=False)
 
         # 获取模型的上下文长度
         context_length = self.model.config.context_length
