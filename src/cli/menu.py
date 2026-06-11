@@ -11,6 +11,11 @@ import torch
 from config import paths
 from config.defaults import DataConfig, GenerationConfig, GPTConfig, TrainingConfig
 
+# 允许 torch.load(weights_only=True) 加载自定义 dataclass
+torch.serialization.add_safe_globals(
+    [GPTConfig, DataConfig, GenerationConfig, TrainingConfig]
+)
+
 
 def _build_tokenizer(data_config: DataConfig = None):
     """从训练数据构建分词器"""

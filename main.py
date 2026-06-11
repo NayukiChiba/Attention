@@ -26,6 +26,11 @@ from src.inference.generator import TextGenerator
 from src.model.gpt import GPT
 from src.train.trainer import Trainer
 
+# 允许 torch.load(weights_only=True) 加载自定义 dataclass
+torch.serialization.add_safe_globals(
+    [GPTConfig, DataConfig, GenerationConfig, TrainingConfig]
+)
+
 
 def _build_tokenizer(data_config: DataConfig = None):
     """从训练数据构建分词器"""
