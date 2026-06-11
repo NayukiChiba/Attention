@@ -94,23 +94,25 @@ class Trainer:
         self.optimizer = create_optimizer(model, config)
         self.scheduler = create_scheduler(self.optimizer, config)
 
-        # 早停
+        # 早停（关闭收敛检测，避免 loss 稳定时误触发）
         self.early_stopping = EarlyStopping(
             patience=config.early_stopping_patience,
             min_delta=config.early_stopping_min_delta,
             mode="min",
+            convergence_threshold=0,  # 关闭收敛检测
         )
 
         # 训练状态
         self.current_epoch = 1
         self.global_step = 0
 
-        # 训练历史
+        # 训练历史（epoch 级别）
         self.history = {
             "train_loss": [],
             "train_ppl": [],
             "val_loss": [],
             "val_ppl": [],
+            "steps": [],  # 每个 val 点对应的 step
         }
 
     def train_epoch(self) -> tuple[float, float, bool]:
@@ -337,11 +339,12 @@ class Trainer:
             # epoch 结束时验证并记录（用于可视化）
             val_loss, val_ppl = self._validate()
 
-            # 记录 epoch 历史
+            # 记录 epoch 历史（x 轴用 step）
             self.history["train_loss"].append(train_loss)
             self.history["train_ppl"].append(train_ppl)
             self.history["val_loss"].append(val_loss)
             self.history["val_ppl"].append(val_ppl)
+            self.history["steps"].append(self.global_step)
 
             # 早停检查
             if should_stop:
