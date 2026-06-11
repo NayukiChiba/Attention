@@ -145,6 +145,7 @@ class Trainer:
                     loss = nn.functional.cross_entropy(
                         logits.view(-1, logits.size(-1)),
                         target_ids.view(-1),
+                        ignore_index=0,  # 忽略 PAD token (id=0)
                     )
                 scaler.scale(loss).backward()
                 scaler.unscale_(self.optimizer)
@@ -156,6 +157,7 @@ class Trainer:
                 loss = nn.functional.cross_entropy(
                     logits.view(-1, logits.size(-1)),
                     target_ids.view(-1),
+                    ignore_index=0,  # 忽略 PAD token (id=0)
                 )
                 loss.backward()
                 grad_norm = clip_gradients(self.model, self.config.grad_clip)
@@ -226,6 +228,7 @@ class Trainer:
                 loss = nn.functional.cross_entropy(
                     logits.view(-1, logits.size(-1)),
                     target_ids.view(-1),
+                    ignore_index=0,  # 忽略 PAD token (id=0)
                 )
 
                 total_loss += loss.item()
