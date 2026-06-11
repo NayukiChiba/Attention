@@ -103,6 +103,14 @@ class TextGenerator:
             if temperature > 0 and temperature != 1.0:
                 next_token_logits = next_token_logits / temperature
 
+            # 重复惩罚：降低已生成 token 的 logits，减少循环重复
+            if self.config.repetition_penalty != 1.0:
+                for tokenId in set(input_ids[0].tolist()):
+                    if next_token_logits[0, tokenId] < 0:
+                        next_token_logits[0, tokenId] *= self.config.repetition_penalty
+                    else:
+                        next_token_logits[0, tokenId] /= self.config.repetition_penalty
+
             # Top-K 过滤
             if top_k > 0:
                 next_token_logits = self._top_k_filtering(next_token_logits, top_k)

@@ -82,8 +82,8 @@ class NewsDataset(Dataset):
         # 2. 实时编码为 token ids
         token_ids = self.tokenizer.encode(text)
 
-        # 3. 随机序列长度（最短 8 token，让模型学会处理短序列）
-        min_len = max(8, self.block_size // 16)
+        # 3. 随机序列长度（最短 4 token，匹配生成时的短 prompt）
+        min_len = max(4, self.block_size // 32)
         max_len = min(self.block_size + 1, len(token_ids))
         if max_len <= min_len:
             chunk_len = max_len
