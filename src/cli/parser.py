@@ -209,7 +209,10 @@ def create_parser() -> argparse.ArgumentParser:
     eval_parser = subparsers.add_parser("eval", help="评估模型")
 
     eval_parser.add_argument(
-        "--checkpoint", type=str, required=True, help="模型检查点路径(必需)"
+        "--checkpoint",
+        type=str,
+        required=True,
+        help="模型检查点文件名(必需, 如 best_model.pth)",
     )
     eval_parser.add_argument(
         "--split",
@@ -231,7 +234,10 @@ def create_parser() -> argparse.ArgumentParser:
     generate_parser = subparsers.add_parser("generate", help="生成文本")
 
     generate_parser.add_argument(
-        "--checkpoint", type=str, required=True, help="模型检查点路径(必需)"
+        "--checkpoint",
+        type=str,
+        required=True,
+        help="模型检查点文件名(必需, 如 best_model.pth)",
     )
     generate_parser.add_argument(
         "--prompt", type=str, default=None, help="输入提示文本,不指定则进入交互模式"
