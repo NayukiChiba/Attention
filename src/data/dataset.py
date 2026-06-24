@@ -3,6 +3,8 @@ src/data/dataset.py
 创建Dataset和DataLoader
 """
 
+import random
+import re
 from pathlib import Path
 from typing import Tuple
 
@@ -62,46 +64,64 @@ class NewsDataset(Dataset):
         print(f"数据集加载完成, 共 {len(texts)} 条文本")
 
         # 只保存文本，不预先编码（避免内存爆炸）
-        self.texts = [t for t in texts if len(t) >= block_size]  # 过滤太短的文本
+        # 不按 block_size 过滤短文本，保留完整短句有助于模型学习句子结束。
+        self.texts = [t for t in texts if len(t) >= 4]
         print(f"过滤后剩余 {len(self.texts)} 条文本")
 
     def __len__(self):
         return len(self.texts)
 
+    def _splitIntoSentences(self, text: str) -> list[str]:
+        """按中文标点切分句子，保留句末标点。"""
+        sentences = re.findall(r"[^。！？!?；;]+[。！？!?；;]?", text)
+        return [sentence.strip() for sentence in sentences if sentence.strip()]
+
+    def _selectTextSpan(self, text: str) -> str:
+        """优先选择完整句段，过长时再退化为连续片段。"""
+        maxTokenCount = self.block_size + 1
+        minTokenCount = max(8, min(self.block_size // 8, 24))
+        candidates = []
+
+        sentences = self._splitIntoSentences(text)
+        for startIndex in range(len(sentences)):
+            spanParts = []
+            for sentence in sentences[startIndex:]:
+                spanParts.append(sentence)
+                spanText = "".join(spanParts)
+                tokenCount = len(self.tokenizer.encode(spanText))
+                if tokenCount > maxTokenCount:
+                    break
+                if tokenCount >= minTokenCount:
+                    candidates.append(spanText)
+
+        if candidates:
+            return random.choice(candidates)
+
+        token_ids = self.tokenizer.encode(text)
+        if len(token_ids) <= maxTokenCount:
+            return text
+
+        # 找不到合适完整句时，随机取一段固定长度上下文。
+        start = random.randint(0, len(token_ids) - maxTokenCount)
+        spanIds = token_ids[start : start + maxTokenCount]
+        return self.tokenizer.decode(spanIds)
+
     def __getitem__(self, idx) -> Tuple[torch.Tensor, torch.Tensor]:
         """
-        返回第 idx 个样本的输入序列和目标序列（实时编码，随机长度）
+        返回第 idx 个样本的输入序列和目标序列（实时编码）
 
-        使用随机序列长度训练，让模型适应短上下文（生成时 prompt 可能很短）
+        优先使用完整句段训练，让模型学习自然起止和句末标点。
         """
-        import random
 
         # 1. 取出原始文本
         text = self.texts[idx]
 
-        # 2. 实时编码为 token ids
-        token_ids = self.tokenizer.encode(text)
+        # 2. 实时编码为 token ids，保留 BOS/EOS。
+        spanText = self._selectTextSpan(text)
+        token_ids = self.tokenizer.encode(spanText)
+        token_ids = token_ids[: self.block_size + 1]
 
-        # 3. 随机序列长度（最短 4 token，匹配生成时的短 prompt）
-        min_len = max(4, self.block_size // 32)
-        max_len = min(self.block_size + 1, len(token_ids))
-        if max_len <= min_len:
-            chunk_len = max_len
-        else:
-            chunk_len = random.randint(min_len, max_len)
-
-        # 4. 随机截取一段
-        if len(token_ids) > chunk_len:
-            max_start = len(token_ids) - chunk_len
-            start = random.randint(0, max_start)
-            token_ids = token_ids[start : start + chunk_len]
-
-        # 5. 如果不够长，用 PAD 填充
-        if len(token_ids) < chunk_len and chunk_len <= self.block_size + 1:
-            pad_id = self.tokenizer.pad_token_id
-            token_ids = token_ids + [pad_id] * (chunk_len - len(token_ids))
-
-        # 6. 切分为输入和目标 (target 是 input 右移一位)
+        # 3. 切分为输入和目标 (target 是 input 右移一位)
         input_ids = torch.tensor(token_ids[:-1], dtype=torch.long)
         target_ids = torch.tensor(token_ids[1:], dtype=torch.long)
         return input_ids, target_ids
@@ -214,10 +234,19 @@ if __name__ == "__main__":
         print(f"input_ids[0][:10]: {input_ids[0][:10].tolist()}")
         print(f"target_ids[0][:10]: {target_ids[0][:10].tolist()}")
 
-        # 验证 target 是 input 右移 1 位
-        assert torch.all(input_ids[:, 1:] == target_ids[:, :-1]), (
-            "target 不是 input 右移！"
-        )
+        # 验证每条样本的有效 token 区间是右移关系。
+        # padding 后不能直接整批比较，否则 EOS 和 PAD 边界会误报。
+        padId = tokenizer.pad_token_id
+        for rowIndex in range(input_ids.shape[0]):
+            validLength = int((input_ids[rowIndex] != padId).sum().item())
+            if validLength <= 1:
+                continue
+
+            assert torch.all(
+                input_ids[rowIndex, 1:validLength]
+                == target_ids[rowIndex, : validLength - 1]
+            ), f"第 {rowIndex} 条样本 target 不是 input 右移！"
+
         print("target 正确右移")
         break
 

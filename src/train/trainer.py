@@ -133,6 +133,7 @@ class Trainer:
         """
         self.model.train()
         total_loss = 0.0
+        processed_batches = 0
         num_batches = len(self.train_loader)
 
         # 自动混合精度(AMP)加速训练
@@ -180,6 +181,7 @@ class Trainer:
 
             # 记录指标
             total_loss += loss.item()
+            processed_batches += 1
             self.global_step += 1
 
             # 计算困惑度
@@ -208,9 +210,11 @@ class Trainer:
                 prefix="train",
             )
 
-            # 每 100 步验证并保存检查点
-            if self.global_step % 100 == 0:
-                val_loss, val_ppl = self._validate()
+            # 按固定间隔验证并保存检查点
+            if self.global_step % self.config.validation_interval == 0:
+                val_loss, val_ppl = self._validate(
+                    max_batches=self.config.validation_batches
+                )
 
                 # 记录到 step 级历史（用于可视化）
                 self.step_history["steps"].append(self.global_step)
@@ -254,6 +258,18 @@ class Trainer:
 
                 # 切回训练模式
                 self.model.train()
+
+            if self.global_step >= self.config.total_steps:
+                avg_loss = total_loss / max(1, processed_batches)
+                self.early_stopping.should_stop = True
+                self.early_stopping.stop_reason = (
+                    f"达到最大训练步数 total_steps={self.config.total_steps}"
+                )
+                return (
+                    avg_loss,
+                    torch.exp(torch.tensor(avg_loss)).item(),
+                    True,
+                )
 
         avg_loss = total_loss / num_batches
         avg_ppl = torch.exp(torch.tensor(avg_loss)).item()
@@ -353,7 +369,9 @@ class Trainer:
             train_loss, train_ppl, should_stop = self.train_epoch()
 
             # epoch 结束时验证并记录（用于可视化）
-            val_loss, val_ppl = self._validate()
+            val_loss, val_ppl = self._validate(
+                max_batches=self.config.validation_batches
+            )
 
             # 记录 epoch 历史（x 轴用 step）
             self.history["train_loss"].append(train_loss)
@@ -371,7 +389,10 @@ class Trainer:
         self.logger.info("训练完成")
 
         # 生成训练可视化图表
-        self._saveVisualizations()
+        if self.config.save_visualizations:
+            self._saveVisualizations()
+        else:
+            self.logger.info("已跳过训练可视化图表生成")
 
         self.logger.close()
 

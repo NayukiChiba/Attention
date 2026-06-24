@@ -53,6 +53,7 @@ class TextGenerator:
         temperature: Optional[float] = None,
         top_k: Optional[int] = None,
         top_p: Optional[float] = None,
+        no_repeat_ngram_size: int = 3,
     ) -> str:
         """
         生成文本
@@ -63,6 +64,7 @@ class TextGenerator:
             temperature: 温度
             top_k: Top-K 采样
             top_p: Nucleus 采样
+            no_repeat_ngram_size: 禁止重复的 n-gram 长度
 
         Returns:
             str: 生成的文本
@@ -115,6 +117,12 @@ class TextGenerator:
             recent_ids = input_ids[0, -3:].tolist()
             if len(set(recent_ids)) == 1:
                 next_token_logits[0, recent_ids[0]] = float("-inf")
+
+            # 禁止重复 n-gram，降低“国国家家”这类循环。
+            if no_repeat_ngram_size > 1:
+                self._ban_repeated_ngrams(
+                    next_token_logits, input_ids, no_repeat_ngram_size
+                )
 
             # Top-K 过滤
             if top_k > 0:
@@ -197,18 +205,43 @@ class TextGenerator:
         sorted_indices_to_remove[..., 1:] = sorted_indices_to_remove[..., :-1].clone()
         sorted_indices_to_remove[..., 0] = False
 
-        # 创建 mask
-        mask = torch.ones_like(logits) * float("-inf")
-        mask.scatter_(-1, sorted_indices, sorted_logits)
+        # 将需要移除的位置映射回原始 token id。
+        indices_to_remove = torch.zeros_like(logits, dtype=torch.bool)
+        indices_to_remove.scatter_(-1, sorted_indices, sorted_indices_to_remove)
 
-        # 应用 mask
-        mask[
-            sorted_indices_to_remove.scatter(
-                -1, sorted_indices, sorted_indices_to_remove
-            )
-        ] = float("-inf")
+        filtered_logits = logits.clone()
+        filtered_logits[indices_to_remove] = float("-inf")
+        return filtered_logits
 
-        return mask
+    def _ban_repeated_ngrams(
+        self,
+        logits: torch.Tensor,
+        input_ids: torch.Tensor,
+        ngram_size: int,
+    ) -> None:
+        """
+        屏蔽会形成重复 n-gram 的下一个 token。
+
+        Args:
+            logits: 当前步 logits，原地修改
+            input_ids: 已生成 token
+            ngram_size: n-gram 长度
+        """
+        tokenIds = input_ids[0].tolist()
+        if len(tokenIds) < ngram_size - 1:
+            return
+
+        prefixLength = ngram_size - 1
+        currentPrefix = tuple(tokenIds[-prefixLength:])
+        bannedTokens = set()
+
+        for index in range(len(tokenIds) - ngram_size + 1):
+            ngram = tokenIds[index : index + ngram_size]
+            if tuple(ngram[:-1]) == currentPrefix:
+                bannedTokens.add(ngram[-1])
+
+        for tokenId in bannedTokens:
+            logits[0, tokenId] = float("-inf")
 
 
 if __name__ == "__main__":

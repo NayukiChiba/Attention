@@ -10,6 +10,7 @@ import torch.nn as nn
 
 from config.defaults import GPTConfig
 from src.model.embedding import GPTEmbedding
+from src.model.mask import combine_masks, create_causal_mask, create_padding_mask
 from src.model.transformerBlock import TransformerBlock
 
 
@@ -115,6 +116,18 @@ class GPT(nn.Module):
             torch.Tensor: 输出 logits 张量,形状为 (batch_size, seq_length, vocab_size)
             如果 return_attention_weights=True，返回 (logits, list_of_attn_weights)
         """
+        batch_size, seq_length = input_ids.shape
+
+        if attention_mask is None:
+            pad_token_id = getattr(self.config, "pad_token_id", 0)
+            causal_mask = create_causal_mask(seq_length, device=input_ids.device)
+            padding_mask = create_padding_mask(
+                input_ids,
+                pad_token_id=pad_token_id,
+                device=input_ids.device,
+            )
+            attention_mask = combine_masks(causal_mask, padding_mask)
+
         # 1. Embedding
         # (batch_size, seq_length) -> (batch_size, seq_length, embedding_dim)
         x = self.embedding(input_ids)
