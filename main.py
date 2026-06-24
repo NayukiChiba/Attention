@@ -31,6 +31,11 @@ torch.serialization.add_safe_globals(
     [GPTConfig, DataConfig, GenerationConfig, TrainingConfig]
 )
 
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8")
+
 
 def _build_tokenizer(data_config: DataConfig = None):
     """从训练数据构建分词器"""
@@ -110,6 +115,8 @@ def _build_training_config(args) -> TrainingConfig:
         "batch_size": getattr(args, "batch_size", None),
         "max_epochs": getattr(args, "epochs", None),
         "total_steps": getattr(args, "total_steps", None),
+        "validation_interval": getattr(args, "validation_interval", None),
+        "validation_batches": getattr(args, "validation_batches", None),
         "grad_clip": getattr(args, "grad_clip", None),
         "seed": getattr(args, "seed", None),
         "num_workers": getattr(args, "num_workers", None),
@@ -125,6 +132,9 @@ def _build_training_config(args) -> TrainingConfig:
     for field_name, arg_value in arg_map.items():
         if arg_value is not None:
             setattr(config, field_name, arg_value)
+
+    if getattr(args, "no_visualizations", False):
+        config.save_visualizations = False
 
     return config
 

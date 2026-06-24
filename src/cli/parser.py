@@ -127,6 +127,24 @@ def create_parser() -> argparse.ArgumentParser:
         help="总训练步数(默认: %(default)s)",
     )
     train_group_train.add_argument(
+        "--validation-interval",
+        type=int,
+        default=train_defaults.validation_interval,
+        help="验证和保存间隔步数(默认: %(default)s)",
+    )
+    train_group_train.add_argument(
+        "--validation-batches",
+        type=int,
+        default=train_defaults.validation_batches,
+        help="每次快速验证 batch 数(默认: %(default)s)",
+    )
+    train_group_train.add_argument(
+        "--no-visualizations",
+        action="store_true",
+        default=False,
+        help="训练结束后不生成可视化图表",
+    )
+    train_group_train.add_argument(
         "--grad-clip",
         type=float,
         default=train_defaults.grad_clip,

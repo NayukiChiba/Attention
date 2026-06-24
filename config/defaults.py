@@ -99,7 +99,7 @@ class GPTConfig:
     # 位置编码类型
     pos_encoding_type: Literal["sinusoidal", "learnable"] = "sinusoidal"
     # 激活函数类型
-    activation: Literal["gelu", "relu"] = "gelu"
+    activation: Literal["gelu", "relu"] = "relu"
     # LayerNorm 位置（pre-norm 训练更稳定）
     norm_type: Literal["pre", "post"] = "pre"
     # LayerNorm 数值稳定项
@@ -138,8 +138,14 @@ class TrainingConfig:
     batch_size: int = 32
     # 最大训练轮数
     max_epochs: int = 50
-    # 总训练步数
-    total_steps: int = 10000
+    # 总训练步数（按 max_epochs 自动计算约 50 × 20000）
+    total_steps: int = 1000000
+    # 每隔多少 step 验证并保存一次检查点
+    validation_interval: int = 100
+    # 每次快速验证使用的最大 batch 数
+    validation_batches: int = 100
+    # 是否在训练结束后保存可视化图表
+    save_visualizations: bool = True
     # 梯度裁剪阈值
     grad_clip: float = 1.0
     # 随机种子（保证训练可复现）
@@ -147,7 +153,7 @@ class TrainingConfig:
     # 训练设备
     device: str = "cuda" if torch.cuda.is_available() else "cpu"
     # DataLoader 线程数（Windows 建议 0-2）
-    num_workers: int = 0
+    num_workers: int = 1
 
     # === 优化器 ===
     # 优化器类型
@@ -172,15 +178,17 @@ class TrainingConfig:
     min_lr_ratio: float = 0.01
 
     # === 早停 ===
-    # 容忍轮数（连续无改善则停止）
-    early_stopping_patience: int = 5
+    # 容忍检查次数（每 100 步检查一次，200 × 100 = 20000 步 ≈ 1 epoch）
+    early_stopping_patience: int = 200
     # 最小改善阈值
-    early_stopping_min_delta: float = 0.0
+    early_stopping_min_delta: float = 1e-4
 
     def __post_init__(self):
         assert self.batch_size > 0, "batch_size 必须 > 0"
         assert self.max_epochs > 0, "max_epochs 必须 > 0"
         assert self.total_steps > 0, "total_steps 必须 > 0"
+        assert self.validation_interval > 0, "validation_interval 必须 > 0"
+        assert self.validation_batches > 0, "validation_batches 必须 > 0"
         assert self.grad_clip > 0, "grad_clip 必须 > 0"
         assert self.num_workers >= 0, "num_workers 必须 >= 0"
 
@@ -218,7 +226,7 @@ class GenerationConfig:
     # Top-P 核采样（累积概率阈值，1.0 为关闭）
     top_p: float = 0.9
     # 重复惩罚（1.0 不惩罚，>1.0 抑制重复）
-    repetition_penalty: float = 1.0
+    repetition_penalty: float = 1.5
     # 是否使用 KV 缓存加速推理
     use_kv_cache: bool = True
 
