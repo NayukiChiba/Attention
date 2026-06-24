@@ -40,10 +40,14 @@ class Evaluator:
         self.model = model
         self.test_loader = test_loader
         self.config = config
+        self.model.to(config.device)
 
-    def evaluate(self) -> Dict[str, float]:
+    def evaluate(self, max_batches: int | None = None) -> Dict[str, float]:
         """
         在测试集上评估模型
+
+        Args:
+            max_batches: 最多评估的 batch 数，None 表示完整评估
 
         Returns:
             Dict[str, float]: 评估指标 {"test_loss": xxx, "test_ppl": xxx}
@@ -52,11 +56,16 @@ class Evaluator:
         self.model.eval()
         total_loss = 0.0
         num_batches = len(self.test_loader)
+        if max_batches is not None:
+            num_batches = min(num_batches, max_batches)
 
-        pbar = tqdm(self.test_loader, desc="[TEST] Evaluating")
+        pbar = tqdm(self.test_loader, desc="[TEST] Evaluating", total=num_batches)
 
         with torch.no_grad():
-            for batch in pbar:
+            for batchIndex, batch in enumerate(pbar):
+                if max_batches is not None and batchIndex >= max_batches:
+                    break
+
                 # 获取输入和目标（dataset 返回 (input_ids, target_ids) 元组）
                 input_ids, target_ids = batch
                 input_ids = input_ids.to(self.config.device)
@@ -67,8 +76,9 @@ class Evaluator:
 
                 # 计算损失
                 loss = nn.functional.cross_entropy(
-                    logits.view(-1, logits.size(-1)),
-                    target_ids.view(-1),
+                    logits.reshape(-1, logits.size(-1)),
+                    target_ids.reshape(-1),
+                    ignore_index=0,
                 )
 
                 total_loss += loss.item()

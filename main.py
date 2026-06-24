@@ -245,8 +245,12 @@ def eval_main(args):
     model = GPT(model_config)
     model.load_state_dict(checkpoint["model_state_dict"])
 
-    # 5. 创建数据加载器
+    # 5. 创建训练配置并移动模型到同一设备
     training_config = _build_training_config(args)
+    model.to(training_config.device)
+    model.eval()
+
+    # 6. 创建数据加载器
     _, _, test_loader = _create_dataloaders(tokenizer, model_config, training_config)
 
     # 如果指定了 split，用对应的数据加载器
@@ -260,9 +264,9 @@ def eval_main(args):
                 tokenizer, model_config, training_config
             )
 
-    # 6. 评估
+    # 7. 评估
     evaluator = Evaluator(model, test_loader, training_config)
-    metrics = evaluator.evaluate()
+    metrics = evaluator.evaluate(max_batches=getattr(args, "max_batches", None))
 
     print()
     print("=" * 60)

@@ -245,6 +245,12 @@ def create_parser() -> argparse.ArgumentParser:
         default=train_defaults.batch_size,
         help="评估批次大小(默认: %(default)s)",
     )
+    eval_parser.add_argument(
+        "--max-batches",
+        type=int,
+        default=None,
+        help="最多评估多少个 batch，默认评估完整数据集",
+    )
 
     # ============================================================
     # generate 子命令
